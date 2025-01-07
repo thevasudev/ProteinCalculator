@@ -1,11 +1,12 @@
+require('dotenv').config(); // If using a .env file, make sure to install dotenv
+
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
-const JWT_SECRET = 'fee146ea4d2f12213f02153ac0b4400270662eb7cb47b408522e6d7835c65995ceae96a743f210debacbd4ed4d1815ba70e49694d4da3066f5bc74aab8570257'; // Replace with a secure secret key
-
-// Predefined admin credentials
-const ADMIN_USERNAME = 'adminvasudev';
-const ADMIN_PASSWORD = bcrypt.hashSync('Vasudev@123', 10); // Prehashed password
+// Load from environment variables
+const JWT_SECRET = process.env.JWT_SECRET;
+const ADMIN_USERNAME = process.env.ADMIN_USERNAME;
+const ADMIN_PASSWORD_HASH = bcrypt.hashSync(process.env.ADMIN_PASSWORD, 10); // Pre-hash the password
 
 // Admin login
 exports.login = async (req, res) => {
@@ -17,7 +18,8 @@ exports.login = async (req, res) => {
     }
 
     // Verify credentials
-    if (username !== ADMIN_USERNAME || !(await bcrypt.compare(password, ADMIN_PASSWORD))) {
+    // Instead of re-hashing every time, you could store the hashed password in an env var directly:
+    if (username !== ADMIN_USERNAME || !(await bcrypt.compare(password, ADMIN_PASSWORD_HASH))) {
       return res.status(401).json({ error: 'Invalid credentials.' });
     }
 
