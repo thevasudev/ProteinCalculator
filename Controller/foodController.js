@@ -1,38 +1,40 @@
-// backend/controllers/foodController.js
+// controllers/foodController.js
 
 const Food = require('../Model/foodModel');
+const FoodType = require('../Model/foodTypeModel');
 
-// Reference DB with known foods (protein per 100g)
-const foodDB = {
-  banana: { proteinPer100g: 1.1 },
-  rice: { proteinPer100g: 2.7 },
-  chicken: { proteinPer100g: 31 },
-  // ... add more if needed
+// Helper function to calculate calories to burn for protein
+const calculateCaloriesToBurn = (protein) => {
+  return (protein * 1.5).toFixed(2); // Using 1.5 calories per gram of protein
 };
 
+// Create a single food entry
 exports.createFood = async (req, res) => {
   try {
     const { foodType, grams } = req.body;
 
+    // Validate request body
     if (!foodType || !grams) {
       return res.status(400).json({ error: 'foodType and grams are required.' });
     }
 
-    const lowerCaseType = foodType.toLowerCase();
+    // Find food type in database
+    const foodData = await FoodType.findOne({ name: foodType.toLowerCase() });
 
-    if (!foodDB[lowerCaseType]) {
+    if (!foodData) {
       return res.status(400).json({ error: `Unknown food type: ${foodType}` });
     }
 
-    // Calculate protein: (proteinPer100g * grams) / 100
-    const { proteinPer100g } = foodDB[lowerCaseType];
-    const calculatedProtein = ((proteinPer100g * grams) / 100).toFixed(2);
+    // Calculate protein and calories to burn
+    const calculatedProtein = ((foodData.proteinPer100g * grams) / 100).toFixed(2);
+    const caloriesToBurn = calculateCaloriesToBurn(calculatedProtein);
 
-    // Create and save the food entry
+    // Create and save new food entry
     const newFood = new Food({
-      foodType: lowerCaseType,
+      foodType: foodData.name,
       grams: Number(grams),
       protein: Number(calculatedProtein),
+      caloriesToBurn: Number(caloriesToBurn),
     });
 
     await newFood.save();
@@ -46,16 +48,19 @@ exports.createFood = async (req, res) => {
   }
 };
 
+// Create multiple food entries// Create multiple food entries
 exports.createMultipleFoods = async (req, res) => {
     try {
       const { foods } = req.body;
   
+      // Validate request body
       if (!foods || !Array.isArray(foods) || foods.length === 0) {
         return res.status(400).json({ error: 'Please provide an array of foods.' });
       }
   
       const processedFoods = [];
       let totalProtein = 0;
+      let totalCaloriesToBurn = 0;
   
       // Process each food item
       for (const item of foods) {
@@ -65,77 +70,49 @@ exports.createMultipleFoods = async (req, res) => {
           return res.status(400).json({ error: 'Each food must have foodType and grams.' });
         }
   
-        const lowerCaseType = foodType.toLowerCase();
+        const foodData = await FoodType.findOne({ name: foodType.toLowerCase() });
   
-        if (!foodDB[lowerCaseType]) {
+        if (!foodData) {
           return res.status(400).json({ error: `Unknown food type: ${foodType}` });
         }
   
-        const proteinPer100g = foodDB[lowerCaseType].proteinPer100g;
-        const calculatedProtein = ((proteinPer100g * grams) / 100).toFixed(2);
+        const calculatedProtein = ((foodData.proteinPer100g * grams) / 100).toFixed(2);
+        const caloriesToBurn = calculateCaloriesToBurn(calculatedProtein);
   
-        // Add processed food item to array
         processedFoods.push({
-          foodType: lowerCaseType,
+          foodType: foodData.name,
           grams: Number(grams),
           protein: Number(calculatedProtein),
+          caloriesToBurn: Number(caloriesToBurn),
         });
   
-        // Add to total protein
         totalProtein += Number(calculatedProtein);
+        totalCaloriesToBurn += Number(caloriesToBurn);
       }
   
-      // Create a single document with all foods and the total protein
+      // Create and save document with multiple food entries
       const newFoodDocument = new Food({
         foods: processedFoods,
         totalProtein: totalProtein.toFixed(2),
+        totalCaloriesToBurn: totalCaloriesToBurn.toFixed(2), // Ensure this is saved
       });
   
       await newFoodDocument.save();
   
       return res.status(201).json({
-        message: 'Multiple foods created successfully in a single document',
-        document: newFoodDocument,
+        message: 'Multiple foods created successfully',
+        document: {
+          foods: processedFoods,
+          totalProtein: totalProtein.toFixed(2),
+          totalCaloriesToBurn: totalCaloriesToBurn.toFixed(2), // Include this in the response
+          _id: newFoodDocument._id,
+          createdAt: newFoodDocument.createdAt,
+          updatedAt: newFoodDocument.updatedAt,
+          __v: newFoodDocument.__v,
+        },
       });
     } catch (error) {
       return res.status(500).json({ error: error.message });
     }
   };
   
-  
-/**
- * GET /api/foods/:id
- * Get a food entry by ID and return its protein
- * Params: id (food entry ID)
- */
-exports.getFoodById = async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const food = await Food.findById(id);
-
-    if (!food) {
-      return res.status(404).json({ error: 'Food not found.' });
-    }
-
-    return res.json({
-      food,
-      totalProtein: food.protein,
-    });
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-};
-
-/**
- * GET /api/foods
- * Get all food entries
- */
-exports.getAllFoods = async (req, res) => {
-  try {
-    const foods = await Food.find(); // Fetch all food entries
-    return res.json(foods);
-  } catch (error) {
-    return res.status(500).json({ error: error.message });
-  }
-};
