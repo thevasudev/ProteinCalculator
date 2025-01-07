@@ -23,7 +23,6 @@ const adminRoutes = require('./Route/adminRoute');
 const visitRoutes = require('./Route/visitRoute');
 
 
-
 app.use('/api/admin', adminRoutes);
 app.use('/api/foods', foodRoutes);
 app.use('/api/foodTypes', foodTypeRoutes);
